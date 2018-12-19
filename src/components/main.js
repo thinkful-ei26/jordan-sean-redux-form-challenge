@@ -1,5 +1,7 @@
 import React from 'react';
-import {reduxForm, Field} from 'redux-form';
+import {reduxForm, Field, SubmissionError} from 'redux-form';
+import { containsValue, nonEmpty, fiveCharacters, numbers } from '../validators.js'
+import Input from './input.js'
 
 //create a stateless component
 //return simlpe jsx
@@ -8,35 +10,67 @@ import {reduxForm, Field} from 'redux-form';
 
 
 class Main extends React.Component {
-    onSubmit(values) {console.log(values);}
+    onSubmit(values){
+        console.log(values)
+    return fetch('https://us-central1-delivery-form-api.cloudfunctions.net/api/report', {
+        method: 'POST',
+        body: JSON.stringify(values),
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+        .then (res => {
+            if (!res.ok) {
+                if (
+                    res.headers.has('content-type') &&
+                    res.headers
+                       .get('content-type')
+                       .startsWith('application/json')
+                ) {
+                    return res.JSON().then(err => Promise.reject(err));
+                }
+                return Promise.reject({
+                    code: res.status,
+                    message: res.statusText
+                })
+            }
+            return;
+        })
+        .then(() => console.log('Submitted with values', values))
+        .catch(err => {
+            const {reason, message, location} = err;
+            if (reason === 'ValidationError') {
+                return Promise.reject(
+                    new SubmissionError({
+                        [location]: message
+                    })
+                );
+            }
+            return Promise.reject(
+                new SubmissionError({
+                    _error: 'Error submitting message'
+                })
+            );
+        });
+    
+    
+    }
     render() {
         return (
         <form onSubmit={this.props.handleSubmit(values => this.onSubmit(values))}>
             <h1>Report a problem with your delivery</h1>
-            <label htmlFor='tracking'>Tracking number required</label>
-            {/* <input id='tracking'/> */}
-            <Field name='tracking' id='tracking' type='text' component='input' />
+            <Field name='trackingNumber' label='Tracking number required' id='tracking' type='text' component={Input} validate={[ containsValue, nonEmpty, numbers, fiveCharacters]}/>
             <div className = 'issues'>
-                <label htmlFor='issue-selection'>What is your issue?</label>
-                {/* <select id='issue-selection'>
-                    <option value='My delivery hasnt arrived'>My delivery hasnt arrived</option>
-                    <option value='The wrong item was delivered'>The wrong item was delivered</option>
-                    <option value='Part of my order was missing'>Part of my order was missing</option>
-                    <option value='Some of my order arrived damaged'>Some of my order arrived damaged</option>
-                    <option value='Other (Please provide details below)'>Other (Please provide details below)</option>
-                </select> */}
-                <Field name='issue-selection' id='issue-selection' component='select'>
+                <Field name='issue' label='What is your issues?' id='issue-selection' component={Input} element='select'>
                     <option value=''>-- Please Select --</option>
-                    <option value='My delivery hasnt arrived'>My delivery hasnt arrived</option>
-                    <option value='The wrong item was delivered'>The wrong item was delivered</option>
-                    <option value='Part of my order was missing'>Part of my order was missing</option>
-                    <option value='Some of my order arrived damaged'>Some of my order arrived damaged</option>
-                    <option value='Other (Please provide details below)'>Other (Please provide details below)</option>
+                    <option value='not-delivered'>My delivery hasnt arrived</option>
+                    <option value='wrong-item'>The wrong item was delivered</option>
+                    <option value='missing-part'>Part of my order was missing</option>
+                    <option value='damaged'>Some of my order arrived damaged</option>
+                    <option value='other'>Other (Please provide details below)</option>
                 </Field>
                 <div>
-                    <label htmlFor='issue-detail'>Give more details (optional)</label>
-                    {/* <textarea id='issue-detail' rows='5' cols='30'></textarea> */}
-                    <Field name='issue-detail' id='issue-detail' rows='5' cols='30' component='textarea' />
+                    <Field name='message' label='Give more details (optional)' id='issue-detail' rows='5' cols='30' component={Input} element='textarea' />
                 </div>
             </div>
             <input type='submit' value='Submit' />
